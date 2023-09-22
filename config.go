@@ -77,7 +77,7 @@ func validateFrameworkConfiguration() {
 		config.outputFile = os.Stdout
 	} else {
 		var err error
-		if config.outputFile, err = os.Create(config.OutputFileName); err != nil {
+		if config.outputFile, err = os.OpenFile(config.OutputFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666); err != nil {
 			log.Fatal(err)
 		}
 	}
