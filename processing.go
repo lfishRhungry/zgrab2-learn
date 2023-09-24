@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -13,6 +14,7 @@ import (
 // Grab contains all scan responses for a single host
 type Grab struct {
 	IP     string                  `json:"ip,omitempty"`
+	Port   int                     `json:"port,omitempty"`
 	Domain string                  `json:"domain,omitempty"`
 	Data   map[string]ScanResponse `json:"data,omitempty"`
 }
@@ -22,7 +24,7 @@ type ScanTarget struct {
 	IP     net.IP
 	Domain string
 	Tag    string
-	Port   *uint
+	Port   int
 }
 
 func (target ScanTarget) String() string {
@@ -37,6 +39,9 @@ func (target ScanTarget) String() string {
 	} else {
 		res = target.Domain
 	}
+	if target.Port >= 0 {
+		res += " port:" + strconv.Itoa(target.Port)
+	}
 	if target.Tag != "" {
 		res += " tag:" + target.Tag
 	}
@@ -46,11 +51,16 @@ func (target ScanTarget) String() string {
 // Host gets the host identifier as a string: the IP address if it is available,
 // or the domain if not.
 func (target *ScanTarget) Host() string {
+	res := ""
 	if target.IP != nil {
-		return target.IP.String()
+		res = target.IP.String()
 	} else if target.Domain != "" {
-		return target.Domain
+		res = target.Domain
 	}
+	if target.Port >= 0 {
+		res += ":" + strconv.Itoa(target.Port)
+	}
+
 	log.Fatalf("Bad target %s: no IP/Domain", target.String())
 	panic("unreachable")
 }
@@ -59,8 +69,8 @@ func (target *ScanTarget) Host() string {
 func (target *ScanTarget) Open(flags *BaseFlags) (net.Conn, error) {
 	var port uint
 	// If the port is supplied in ScanTarget, let that override the cmdline option
-	if target.Port != nil {
-		port = *target.Port
+	if target.Port >= 0 {
+		port = uint(target.Port)
 	} else {
 		port = flags.Port
 	}
@@ -86,8 +96,8 @@ func (target *ScanTarget) OpenTLS(baseFlags *BaseFlags, tlsFlags *TLSFlags) (*TL
 func (target *ScanTarget) OpenUDP(flags *BaseFlags, udp *UDPFlags) (net.Conn, error) {
 	var port uint
 	// If the port is supplied in ScanTarget, let that override the cmdline option
-	if target.Port != nil {
-		port = *target.Port
+	if target.Port >= 0 {
+		port = uint(target.Port)
 	} else {
 		port = flags.Port
 	}
@@ -123,6 +133,7 @@ func BuildGrabFromInputResponse(t *ScanTarget, responses map[string]ScanResponse
 	}
 	return &Grab{
 		IP:     ipstr,
+		Port:   t.Port,
 		Domain: t.Domain,
 		Data:   responses,
 	}
